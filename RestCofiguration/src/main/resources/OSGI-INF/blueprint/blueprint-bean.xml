@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:cm="http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0"
+       xsi:schemaLocation="
+         http://www.osgi.org/xmlns/blueprint/v1.0.0 https://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd
+         http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd
+         http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0 http://aries.apache.org/schemas/blueprint-cm/blueprint-cm-1.1.0.xsd">
+
+
+    <bean id="dataSource" class="org.postgresql.ds.PGSimpleDataSource">
+      <property name="serverName" value="localhost"/>
+      <property name="portNumber" value="5432"/>
+      <property name="databaseName" value="mydb"/>
+      <property name="user" value="postgres"/>
+      <property name="password" value="root"/>
+    </bean>
+
+    <bean id="mySqlComponent" class="org.apache.camel.component.sql.SqlComponent">
+     <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+
+  <camelContext id="blueprint-bean-context" xmlns="http://camel.apache.org/schema/blueprint">
+
+     <dataFormats>
+      <json id="jsonFormat" library="Jackson" />
+    </dataFormats>
+    <restConfiguration component="jetty" contextPath="/v1/api" host="localhost" port="9092"/>
+
+
+    <!-- <routeBuilder xmlns="http://camel.apache.org/schema/spring"> 
+      <from uri="direct:start"/> 
+      <to uri="plantuml:camel"/> 
+    </routeBuilder> -->
+
+      
+    <rest path="/person">
+      <get>
+        <route id="get_route" streamCache="true">
+          <log id="log1" message="**** get All data from database ****"/>
+          <setBody id ="set_body1">
+            <simple>select * from person </simple>
+          </setBody>
+          <to uri="jdbc:dataSource"/>
+          <!-- <log id="log_output" message="****** ${body}"/> -->
+         <split>
+            <simple>${body}</simple>
+            <log message=">>> Data are :: ${body}"/>
+          </split> 
+          <log id="log2" message="***** Get data successfully **********"/>
+        </route>
+      </get>
+    </rest>
+
+      <!-- ********* Create Data ******* -->
+
+    <rest path="/Create_person">
+      <post>
+        <route id="post-data" streamCache="true">
+          <log id="log3" message=" *** Create data in DataBase ******"/>
+          <unmarshal id="_unmarshal1" ref="jsonFormat"/>
+          <!-- <log id="log_3" message=" *** Body after unmarshl *** "/> -->
+          <setBody id="set_body2">
+           <simple>insert into person (id,firstname,lastname,email) values (${body[id]},'${body[firstname]}','${body[lastname]}','${body[email]}'); </simple>
+          </setBody>
+          <log id="Output_before_post" message=" ********* ${body} "/>
+          <to uri="jdbc:dataSource"/>
+          <log id="log_output1" message="*** Data post successfully ***** "/>
+        </route>
+      </post>
+    </rest>
+
+
+     <!-- ************* Get data by Id ************** -->
+    <rest path="/person/">
+      <get uri="/{id}">
+        <route id="get_by_id" streamCache="true">
+          <log id="log4" message=" ***** Get Data By Id **** "/>
+          <setBody id="SBody_getById">
+            <simple>select * from person where id= ${header.id} order by 1 desc</simple>
+          </setBody>
+          <to uri="jdbc:dataSource"/>
+          <log id="getdata" message=" ********** ${body}"/>
+          <log id="outPut_Message1" message="********* Data Get Successfully ********** "/>
+        </route>
+      </get>
+    </rest>
+
+
+      <!-- ********** update the data through id *************** -->
+    <rest path="/update_person/">
+      <put uri="/{id}">
+        <route id="update_data" streamCache="true">
+          <log id="log5" message=" ***** Update data By id ******* "/>
+          <unmarshal id="Unmarshal_2" ref="jsonFormat"/>
+          <setBody id="setBodyUpdate">
+            <simple> update person set firstname='${body[firstname]}', lastname='${body[lastname]}', email='${body[email]}' where id=${header.id};</simple>
+          </setBody>
+          <log id="output_for_update" message="***** ${body}"/>
+          <to uri="jdbc:dataSource"/>
+          <log id="Outpur_message" message="******* update Successfully **** "/>
+        </route>
+      </put>
+    </rest>
+
+      <!-- ********** Detete data by Id ********** -->
+
+    <rest path="/delete_person/">
+     <delete uri="/{id}">
+       <route id="deleted_By_id" streamCache ="true">
+         <log id="log6" message="***** Deleted By Id ******* "/>
+         <setBody id="deleted_setBody">
+           <simple>delete from person where id=${header.id};</simple>
+         </setBody>
+         <to uri="jdbc:dataSource"/>
+         <log id="DeletedMsg" message="********* Deleted Data Successfully ****** "/>
+       </route>
+     </delete>
+    </rest>
+
+  </camelContext>
+</blueprint>
+
+
+
+
